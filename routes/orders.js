@@ -1,6 +1,7 @@
 const express = require("express");
 const Order = require("../models/Order");
 const Product = require("../models/Product");
+const PromoCode = require("../models/PromoCode");
 const { authenticate, adminOnly } = require("../middleware/auth");
 
 const router = express.Router();
@@ -59,9 +60,16 @@ router.post("/", authenticate, async (req, res) => {
       await Product.findByIdAndUpdate(product._id, { $inc: { stock: -item.quantity } });
     }
 
-    const discount = promoCode === "SAVE20" ? subtotal * 0.2 : 0;
+    let discount = 0;
+    if (promoCode) {
+      const promo = await PromoCode.findOne({ code: promoCode.toUpperCase() });
+      if (promo && promo.isValid(subtotal)) {
+        discount = Math.round(subtotal * (promo.discountPercent / 100) * 100) / 100;
+        await PromoCode.findByIdAndUpdate(promo._id, { $inc: { usedCount: 1 } });
+      }
+    }
     const shipping = subtotal >= 100 ? 0 : 9.99;
-    const total = subtotal - discount + shipping;
+    const total = Math.round((subtotal - discount + shipping) * 100) / 100;
 
     const order = await Order.create({
       user: req.user._id,
@@ -71,7 +79,7 @@ router.post("/", authenticate, async (req, res) => {
       shipping,
       total,
       shippingInfo,
-      promoCode,
+      promoCode: promoCode || null,
     });
 
     res.status(201).json(order);
@@ -89,6 +97,27 @@ router.put("/:id/status", authenticate, adminOnly, async (req, res) => {
     res.json(order);
   } catch {
     res.status(500).json({ error: "Failed to update order" });
+  }
+});
+
+router.post("/:id/cancel", authenticate, async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ error: "Order not found" });
+    if (req.user.role !== "admin" && order.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+    if (!["pending", "confirmed"].includes(order.status)) {
+      return res.status(400).json({ error: "Order cannot be cancelled at this stage" });
+    }
+    order.status = "cancelled";
+    await order.save();
+    for (const item of order.items) {
+      await Product.findByIdAndUpdate(item.product, { $inc: { stock: item.quantity } });
+    }
+    res.json(order);
+  } catch {
+    res.status(500).json({ error: "Failed to cancel order" });
   }
 });
 

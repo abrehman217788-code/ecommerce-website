@@ -13,6 +13,7 @@ const newsletterRoutes = require("./routes/newsletter");
 const paymentRoutes = require("./routes/payment");
 const reviewRoutes = require("./routes/reviews");
 const passwordResetRoutes = require("./routes/passwordReset");
+const promoCodesRoutes = require("./routes/promoCodes");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -32,6 +33,7 @@ app.use("/api/newsletter", newsletterRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/auth", passwordResetRoutes);
+app.use("/api/promo-codes", promoCodesRoutes);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });

@@ -2,6 +2,7 @@ require("dotenv").config();
 const mongoose = require("mongoose");
 const Product = require("./models/Product");
 const User = require("./models/User");
+const PromoCode = require("./models/PromoCode");
 
 const products = [
   { name: "SonicBuds Pro", description: "Premium wireless earbuds with active noise cancellation, 30h battery life, and crystal-clear call quality.", price: 149, originalPrice: 199, category: "electronics", image: "https://images.unsplash.com/photo-1590658268037-6bf12f032f75?w=400&q=80&auto=format&fit=crop", rating: 4.8, reviewCount: 2456, stock: 150, badge: "bestseller", colors: [{ name: "Midnight Black", hex: "#1a1a2e" }, { name: "Pearl White", hex: "#f5f0e8" }] },
@@ -29,6 +30,10 @@ async function seed() {
   const customerExists = await User.findOne({ email: "customer@velora.com" });
   if (!customerExists) {
     await User.create({ name: "Customer", email: "customer@velora.com", password: "customer1234", role: "customer" });
+  }
+  const promoExists = await PromoCode.findOne({ code: "SAVE20" });
+  if (!promoExists) {
+    await PromoCode.create({ code: "SAVE20", discountPercent: 20, maxUses: 100, minOrderValue: 0 });
   }
   console.log(`Seeded ${products.length} products`);
   console.log("Admin: admin@velora.com / admin1234");

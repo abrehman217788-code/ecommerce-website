@@ -1,13 +1,16 @@
 {
-  "name": "ecommerce-website",
+  "name": "velora-ecommerce",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "VELORA - Modern E-Commerce Platform with Express, MongoDB, Stripe payments, reviews, and admin dashboard",
+  "main": "server.js",
   "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "seed": "node seed.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["ecommerce", "express", "mongodb", "stripe", "node"],
+  "author": "VELORA",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {

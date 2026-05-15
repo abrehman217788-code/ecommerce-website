@@ -1,6 +1,7 @@
 const express = require("express");
 const Order = require("../models/Order");
 const Product = require("../models/Product");
+const PromoCode = require("../models/PromoCode");
 const { authenticate } = require("../middleware/auth");
 
 const router = express.Router();
@@ -30,7 +31,13 @@ router.post("/create-payment-intent", authenticate, async (req, res) => {
       subtotal += product.price * item.quantity;
     }
 
-    const discount = promoCode === "SAVE20" ? subtotal * 0.2 : 0;
+    let discount = 0;
+    if (promoCode) {
+      const promo = await PromoCode.findOne({ code: promoCode.toUpperCase() });
+      if (promo && promo.isValid(subtotal)) {
+        discount = Math.round(subtotal * (promo.discountPercent / 100) * 100) / 100;
+      }
+    }
     const shipping = subtotal >= 100 ? 0 : 9.99;
     const total = subtotal - discount + shipping;
     const amountInCents = Math.round(total * 100);
@@ -80,7 +87,14 @@ router.post("/confirm", authenticate, async (req, res) => {
       await Product.findByIdAndUpdate(product._id, { $inc: { stock: -item.quantity } });
     }
 
-    const discount = promoCode === "SAVE20" ? subtotal * 0.2 : 0;
+    let discount = 0;
+    if (promoCode) {
+      const promo = await PromoCode.findOne({ code: promoCode.toUpperCase() });
+      if (promo && promo.isValid(subtotal)) {
+        discount = Math.round(subtotal * (promo.discountPercent / 100) * 100) / 100;
+        await PromoCode.findByIdAndUpdate(promo._id, { $inc: { usedCount: 1 } });
+      }
+    }
     const shipping = subtotal >= 100 ? 0 : 9.99;
     const total = subtotal - discount + shipping;
 
