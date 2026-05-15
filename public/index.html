@@ -653,7 +653,7 @@ let products = [];
 let cart = JSON.parse(localStorage.getItem('velora_cart') || '[]');
 let wishlist = [];
 let orders = [];
-let promoApplied = false;
+let appliedPromoCode = null;
 let checkoutCurrentStep = 1;
 
 function apiHeaders() {
@@ -824,7 +824,7 @@ async function applyPromo() {
   try {
     const d = await apiPost('/promo-codes/validate', { code, orderTotal: cart.reduce((s,i) => s + (getProduct(i.id)?.price||0)*i.qty, 0) });
     if (d.valid) {
-      promoApplied = true;
+      appliedPromoCode = code;
       renderCart();
       showToast('Promo applied! ' + d.discountPercent + '% off!');
       msg.style.display = 'none';
@@ -862,11 +862,11 @@ function renderCart() {
       '<button class="cart-qty-btn" onclick="removeFromCart(\''+i.id+'\')" style="margin-left:8px;color:var(--coral)">&times;</button></div></div>' +
       '<div style="font-weight:600">$'+(p.price * i.qty)+'</div></div>';
   }).join('');
-  const discount = promoApplied ? subtotal * 0.2 : 0;
+  const discount = appliedPromoCode ? Math.round(subtotal * 0.2 * 100) / 100 : 0;
   const total = subtotal - discount;
   document.getElementById('cartTotal').textContent = '$' + Math.round(total);
   const msg = document.getElementById('promoMsg');
-  if (promoApplied) { msg.style.display = 'block'; msg.style.color = 'var(--green)'; msg.textContent = 'Promo SAVE20 applied!'; }
+  if (appliedPromoCode) { msg.style.display = 'block'; msg.style.color = 'var(--green)'; msg.textContent = 'Promo ' + appliedPromoCode + ' applied (20% off est.)'; }
   updateCartBadge();
 }
 
@@ -1273,7 +1273,7 @@ async function checkoutStep(n) {
     try {
       const d = await apiPost('/payment/create-payment-intent', {
         items: cart.map(i => ({ productId: i.id, quantity: i.qty })),
-        promoCode: promoApplied ? 'SAVE20' : ''
+        promoCode: appliedPromoCode || ''
       });
       paymentClientSecret = d.clientSecret;
       document.getElementById('checkoutTotalDisplay').textContent = '$' + Math.round(d.total);
@@ -1314,7 +1314,7 @@ async function checkoutStep(n) {
       const order = await apiPost('/payment/confirm', {
         items: cart.map(i => ({ productId: i.id, quantity: i.qty })),
         shippingInfo,
-        promoCode: promoApplied ? 'SAVE20' : '',
+        promoCode: appliedPromoCode || '',
         paymentIntentId: paymentClientSecret ? 'pi_demo_' + Date.now() : null,
       });
       orders.unshift(order);
@@ -1489,7 +1489,7 @@ async function renderAdminOrders() {
     try { const d = await apiGet('/orders?limit=100'); allOrders = d.orders || d; } catch {}
   }
   if (allOrders.length === 0) { body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:rgba(245,240,232,0.3)">No orders yet</td></tr>'; return; }
-  body.innerHTML = allOrders.map(o => '<tr><td>'+(o._id||o.id)+'</td><td>'+(o.items[0] ? getProduct(o.items[0].product||o.items[0].id)?.name || '—' : '—')+'</td><td>'+(o.createdAt?new Date(o.createdAt).toLocaleDateString():o.date)+'</td><td>$'+o.total+'</td><td><span class="status-badge status-processing">'+(o.status||'Processing')+'</span></td></tr>').join('');
+  body.innerHTML = allOrders.map(o => '<tr><td>'+(o._id||o.id)+'</td><td>'+(o.shippingInfo?.name || o.user?.name || '—')+'</td><td>'+(o.createdAt?new Date(o.createdAt).toLocaleDateString():o.date)+'</td><td>$'+o.total+'</td><td><span class="status-badge status-processing">'+(o.status||'Processing')+'</span></td></tr>').join('');
 }
 
 async function renderAnalytics() {

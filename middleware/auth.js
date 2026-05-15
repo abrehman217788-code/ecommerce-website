@@ -1,15 +1,7 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
-
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
-
-function generateToken(user) {
-  return jwt.sign(
-    { id: user._id, email: user.email, role: user.role },
-    JWT_SECRET,
-    { expiresIn: "7d" }
-  );
-}
+const env = require("../config/env");
+const { generateToken } = require("../utils/helpers");
 
 async function authenticate(req, res, next) {
   try {
@@ -18,7 +10,7 @@ async function authenticate(req, res, next) {
       return res.status(401).json({ error: "Authentication required" });
     }
     const token = header.split(" ")[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, env.JWT_SECRET);
     const user = await User.findById(decoded.id);
     if (!user) {
       return res.status(401).json({ error: "User not found" });

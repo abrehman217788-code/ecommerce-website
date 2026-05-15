@@ -1,10 +1,11 @@
 const express = require("express");
+const router = express.Router();
 const multer = require("multer");
-const { authenticate, adminOnly } = require("../middleware/auth");
 const path = require("path");
 const fs = require("fs");
-
-const router = express.Router();
+const uploadController = require("../controllers/uploadController");
+const { authenticate, adminOnly } = require("../middleware/auth");
+const { catchAsync } = require("../utils/AppError");
 
 const uploadDir = path.join(__dirname, "..", "uploads");
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
@@ -27,18 +28,7 @@ const upload = multer({
   },
 });
 
-router.post("/", authenticate, adminOnly, upload.single("image"), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-  const url = `/uploads/${req.file.filename}`;
-  res.json({ url });
-});
-
-router.post("/multiple", authenticate, adminOnly, upload.array("images", 5), (req, res) => {
-  if (!req.files || req.files.length === 0) {
-    return res.status(400).json({ error: "No files uploaded" });
-  }
-  const urls = req.files.map((f) => `/uploads/${f.filename}`);
-  res.json({ urls });
-});
+router.post("/", authenticate, adminOnly, upload.single("image"), catchAsync(uploadController.uploadSingle));
+router.post("/multiple", authenticate, adminOnly, upload.array("images", 5), catchAsync(uploadController.uploadMultiple));
 
 module.exports = router;
