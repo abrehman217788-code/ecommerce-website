@@ -89,9 +89,13 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server
-connectDB().then(() => {
-  app.listen(env.PORT, () => {
-    console.log(`Server running on http://localhost:${env.PORT}`);
+// Auto-start when running standalone; export app when required as sub-app
+if (require.main === module) {
+  connectDB().then(() => {
+    app.listen(env.PORT, () => {
+      console.log(`Server running on http://localhost:${env.PORT}`);
+    });
   });
-});
+} else {
+  module.exports = app;
+}

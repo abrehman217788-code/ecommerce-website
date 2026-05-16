@@ -646,7 +646,8 @@ footer{border-top:1px solid var(--glass-border);margin-top:60px}
 </footer>
 
 <script>
-const API = window.location.origin + '/api';
+const BASE = (window.location.pathname.match(/^\/[^/]+/) || [''])[0];
+const API = window.location.origin + BASE + '/api';
 let TOKEN = localStorage.getItem('velora_token');
 let CURRENT_USER = JSON.parse(localStorage.getItem('velora_user') || 'null');
 let products = [];
