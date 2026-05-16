@@ -4,6 +4,8 @@ const cors = require("cors");
 const path = require("path");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
+const morgan = require("morgan");
+const mongoose = require("mongoose");
 
 const { connectDB } = require("./config/db");
 const env = require("./config/env");
@@ -21,9 +23,10 @@ const promoCodesRoutes = require("./routes/promoCodes");
 
 const app = express();
 
-// Security middleware
+// Security & logging middleware
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
-app.use(cors());
+app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
+app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
 
 // Rate limiting
 const apiLimiter = rateLimit({
@@ -44,8 +47,8 @@ app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);
 
 // Body parsing
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
 // Static files
 app.use(express.static(path.join(__dirname, "public")));
@@ -53,6 +56,7 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // API routes
 app.use("/api/auth", authRoutes);
+app.use("/api/auth", passwordResetRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/users", userRoutes);
@@ -83,7 +87,7 @@ app.use((err, req, res, next) => {
   if (err.message === "Only image files allowed") {
     return res.status(400).json({ error: err.message });
   }
-  console.error("Unhandled error:", err.message);
+  console.error("Unhandled error:", err.stack || err.message);
   res.status(err.statusCode || 500).json({
     error: err.isOperational ? err.message : "Internal server error",
   });
@@ -92,9 +96,19 @@ app.use((err, req, res, next) => {
 // Auto-start when running standalone; export app when required as sub-app
 if (require.main === module) {
   connectDB().then(() => {
-    app.listen(env.PORT, () => {
+    const server = app.listen(env.PORT, () => {
       console.log(`Server running on http://localhost:${env.PORT}`);
     });
+
+    const shutdown = async (signal) => {
+      console.log(`\n${signal} received. Shutting down gracefully...`);
+      server.close(() => console.log("HTTP server closed"));
+      await mongoose.connection.close();
+      console.log("MongoDB connection closed");
+      process.exit(0);
+    };
+    process.on("SIGTERM", () => shutdown("SIGTERM"));
+    process.on("SIGINT", () => shutdown("SIGINT"));
   });
 } else {
   module.exports = app;

@@ -696,6 +696,11 @@ function rateLimit() {
   return true;
 }
 
+function esc(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
 const CATEGORIES = [
   {id:"electronics",name:"Electronics",image:"https://images.unsplash.com/photo-1498049794561-7780e7231661?w=400&q=80&auto=format&fit=crop",count:4},
   {id:"fashion",name:"Fashion",image:"https://images.unsplash.com/photo-1445205170230-053b83016050?w=400&q=80&auto=format&fit=crop",count:5},
@@ -708,12 +713,14 @@ const CATEGORIES = [
 async function loadProducts() {
   try {
     const d = await apiGet('/products?limit=50');
-    products = d.products;
-    renderProducts();
-    renderHeroShowcase();
-    renderCategories();
-    filterProducts(1);
-  } catch {}
+    products = d.products || [];
+    if (products.length === 0) throw new Error('empty');
+  } catch {
+    products = FALLBACK_PRODUCTS;
+  }
+  renderHeroShowcase();
+  renderCategories();
+  renderProducts();
 }
 function getProduct(id) { return products.find(p => p._id === id || p.id === id); }
 function isWishlisted(id) { return wishlist.includes(id); }
@@ -722,9 +729,10 @@ function renderHeroShowcase() {
   const featured = products.filter(p => p.badge === 'bestseller').slice(0, 3);
   showcase.innerHTML = featured.map(p => {
     const pid = p._id || p.id;
+    const en = esc(p.name);
     return `<div class="hero-product-card" onclick="navigate('shop');openProductModal('${pid}')">
-      <img src="${p.image}" alt="${p.name}" loading="lazy" onerror="this.onerror=null;this.src=FALLBACK_IMG">
-      <div class="label">${p.name} — $${p.price}</div>
+      <img src="${p.image}" alt="${en}" loading="lazy" onerror="this.onerror=null;this.src=FALLBACK_IMG">
+      <div class="label">${en} — $${p.price}</div>
     </div>`;
   }).join('');
 }
@@ -751,10 +759,11 @@ function renderProducts() {
 
 function productCardHTML(p, i) {
   const pid = p._id || p.id;
+  const en = esc(p.name), ec = esc(p.category);
   const badge = p.badge === 'new' ? '<span class="product-badge badge-new">New</span>' : p.badge === 'sale' ? '<span class="product-badge badge-sale">Sale</span>' : p.badge === 'bestseller' ? '<span class="product-badge badge-bestseller">Best</span>' : '';
   return '<div class="product-card" onclick="openProductModal(\''+pid+'\')">' +
     '<div class="product-card-image">' +
-      '<img src="'+p.image+'" alt="'+p.name+'" loading="lazy" onerror="this.onerror=null;this.src=FALLBACK_IMG">' +
+      '<img src="'+p.image+'" alt="'+en+'" loading="lazy" onerror="this.onerror=null;this.src=FALLBACK_IMG">' +
       '<div style="position:absolute;inset:0;background:linear-gradient(to top,var(--bg),transparent 50%)"></div>' +
       badge +
       '<button class="product-wishlist'+(isWishlisted(pid)?' active':'')+'" onclick="event.stopPropagation();toggleWishlist(\''+pid+'\')">' +
@@ -762,8 +771,8 @@ function productCardHTML(p, i) {
       '</button>' +
     '</div>' +
     '<div class="product-info">' +
-      '<span class="product-cat">'+p.category+'</span>' +
-      '<h3 class="product-name">'+p.name+'</h3>' +
+      '<span class="product-cat">'+ec+'</span>' +
+      '<h3 class="product-name">'+en+'</h3>' +
       '<div class="product-price"><span class="price-current">$'+p.price+'</span>'+(p.originalPrice?'<span class="price-original">$'+p.originalPrice+'</span>':'')+'</div>' +
       '<div class="product-rating">'+stars(p.rating)+' '+p.rating+' <span style="color:rgba(245,240,232,0.3)">('+p.reviewCount+')</span></div>' +
       '<div class="product-actions"><button class="btn-primary" style="flex:1;justify-content:center;padding:10px;font-size:12px" onclick="event.stopPropagation();addToCart(\''+pid+'\')">Add to Cart</button></div>' +
@@ -856,8 +865,9 @@ function renderCart() {
     const p = getProduct(i.id);
     if (!p) return '';
     subtotal += p.price * i.qty;
-    return '<div class="cart-item"><div class="cart-item-image"><img src="'+p.image+'" alt="'+p.name+'" onerror="this.onerror=null;this.src=FALLBACK_IMG"></div>' +
-      '<div class="cart-item-info"><div class="cart-item-name">'+p.name+'</div><div class="cart-item-price">$'+p.price+'</div>' +
+    const en = esc(p.name);
+    return '<div class="cart-item"><div class="cart-item-image"><img src="'+p.image+'" alt="'+en+'" onerror="this.onerror=null;this.src=FALLBACK_IMG"></div>' +
+      '<div class="cart-item-info"><div class="cart-item-name">'+en+'</div><div class="cart-item-price">$'+p.price+'</div>' +
       '<div class="cart-item-qty"><button class="cart-qty-btn" onclick="updateCartQty(\''+i.id+'\',-1)">&minus;</button>' +
       '<span>'+i.qty+'</span><button class="cart-qty-btn" onclick="updateCartQty(\''+i.id+'\',1)">+</button>' +
       '<button class="cart-qty-btn" onclick="removeFromCart(\''+i.id+'\')" style="margin-left:8px;color:var(--coral)">&times;</button></div></div>' +
@@ -903,9 +913,10 @@ function renderWishlist() {
   empty.style.display = 'none';
   grid.innerHTML = items.map(p => {
     const pid = p._id || p.id;
+    const en = esc(p.name), ec = esc(p.category);
     return '<div class="product-card" onclick="openProductModal(\''+pid+'\')">' +
-    '<div class="product-card-image"><img src="'+p.image+'" alt="'+p.name+'" loading="lazy" onerror="this.onerror=null;this.src=FALLBACK_IMG"></div>' +
-    '<div class="product-info"><span class="product-cat">'+p.category+'</span><h3 class="product-name">'+p.name+'</h3>' +
+    '<div class="product-card-image"><img src="'+p.image+'" alt="'+en+'" loading="lazy" onerror="this.onerror=null;this.src=FALLBACK_IMG"></div>' +
+    '<div class="product-info"><span class="product-cat">'+ec+'</span><h3 class="product-name">'+en+'</h3>' +
     '<div class="product-price"><span class="price-current">$'+p.price+'</span></div>' +
     '<div class="product-actions"><button class="btn-primary" style="flex:1;justify-content:center;padding:10px;font-size:12px" onclick="event.stopPropagation();addToCart(\''+pid+'\')">Add to Cart</button></div></div></div>';
   }).join('');
@@ -915,21 +926,22 @@ function renderWishlist() {
 function openProductModal(id) {
   const p = getProduct(id);
   if (!p) return;
-  const colorsHTML = p.colors.length ? p.colors.map(c => '<div class="variant-swatch active" style="background:'+c+'" title="'+c+'"></div>').join('') : '<span style="color:rgba(245,240,232,0.3);font-size:13px">Standard</span>';
-  const sizesHTML = p.sizes.map(s => '<button class="variant-size active">'+s+'</button>').join('');
+  const colorsHTML = p.colors.length ? p.colors.map(c => '<div class="variant-swatch active" style="background:'+esc(c)+'" title="'+esc(c)+'"></div>').join('') : '<span style="color:rgba(245,240,232,0.3);font-size:13px">Standard</span>';
+  const sizesHTML = p.sizes.map(s => '<button class="variant-size active">'+esc(s)+'</button>').join('');
   const pid = p._id || p.id;
+  const en = esc(p.name), ec = esc(p.category), ed = esc(p.description);
   const badges = (p.badge === 'new' ? '✨ New Arrival ' : '') + (p.badge === 'bestseller' ? '🏆 Bestseller ' : '') + '📦 In Stock: '+p.stock;
   const html = '<button class="modal-close" onclick="closeModal(\'productModal\')">&times;</button>' +
     '<div class="product-detail">' +
-    '<div class="product-detail-image"><img src="'+p.image+'" alt="'+p.name+'" onerror="this.onerror=null;this.src=FALLBACK_IMG">' +
+    '<div class="product-detail-image"><img src="'+p.image+'" alt="'+en+'" onerror="this.onerror=null;this.src=FALLBACK_IMG">' +
     '<button class="product-wishlist'+(isWishlisted(pid)?' active':'')+'" onclick="toggleWishlist(\''+pid+'\')" style="top:16px;right:16px;left:auto;background:rgba(0,0,0,0.6)">' +
     '<svg width="18" height="18" viewBox="0 0 24 24" fill="'+(isWishlisted(pid)?'currentColor':'none')+'" stroke="currentColor" stroke-width="1.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button></div>' +
     '<div class="product-detail-info">' +
-    '<div><span class="product-cat" style="font-size:12px">'+p.category.toUpperCase()+'</span>' +
-    '<h2 style="font-family:var(--font-serif);font-size:32px;margin:4px 0">'+p.name+'</h2>' +
+    '<div><span class="product-cat" style="font-size:12px">'+ec.toUpperCase()+'</span>' +
+    '<h2 style="font-family:var(--font-serif);font-size:32px;margin:4px 0">'+en+'</h2>' +
     '<div class="product-rating" style="font-size:14px">'+stars(p.rating)+' '+p.rating+' ('+p.reviewCount+' reviews)</div></div>' +
     '<div class="product-price"><span class="price-current" style="font-size:28px">$'+p.price+'</span>'+(p.originalPrice?'<span class="price-original" style="font-size:18px">$'+p.originalPrice+'</span>':'')+'</div>' +
-    '<p style="color:rgba(245,240,232,0.6);line-height:1.7">'+p.description+'</p>' +
+    '<p style="color:rgba(245,240,232,0.6);line-height:1.7">'+ed+'</p>' +
     '<div><p style="font-size:13px;color:rgba(245,240,232,0.5);margin-bottom:8px">Color</p><div class="variant-group">'+colorsHTML+'</div></div>' +
     '<div><p style="font-size:13px;color:rgba(245,240,232,0.5);margin-bottom:8px">Size</p><div class="variant-group">'+sizesHTML+'</div></div>' +
     '<div><p style="font-size:13px;color:rgba(245,240,232,0.5);margin-bottom:8px">Quantity</p>' +
@@ -1001,9 +1013,9 @@ async function loadReviews(productId) {
       list.innerHTML = reviews.map(r => '<div style="padding:12px 0;border-bottom:1px solid var(--glass-border)">' +
         '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">' +
         stars(r.rating) +
-        '<span style="font-weight:600;font-size:14px">' + (r.title || '') + '</span></div>' +
-        '<div style="font-size:13px;color:rgba(245,240,232,0.5)">by ' + (r.user?.name || 'Anonymous') + ' &middot; ' + new Date(r.createdAt).toLocaleDateString() + '</div>' +
-        (r.comment ? '<p style="font-size:14px;color:rgba(245,240,232,0.7);margin-top:4px">' + r.comment + '</p>' : '') +
+        '<span style="font-weight:600;font-size:14px">' + esc(r.title || '') + '</span></div>' +
+        '<div style="font-size:13px;color:rgba(245,240,232,0.5)">by ' + esc(r.user?.name || 'Anonymous') + ' &middot; ' + new Date(r.createdAt).toLocaleDateString() + '</div>' +
+        (r.comment ? '<p style="font-size:14px;color:rgba(245,240,232,0.7);margin-top:4px">' + esc(r.comment) + '</p>' : '') +
         '</div>').join('');
     }
     const form = document.getElementById('reviewForm');
@@ -1051,10 +1063,11 @@ function renderRelatedProducts(product) {
     '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">' +
     related.map(p => {
       const pid = p._id || p.id;
+      const en = esc(p.name), ec = esc(p.category);
       return '<div class="product-card" onclick="closeModal(\'productModal\');setTimeout(()=>openProductModal(\''+pid+'\'),300)" style="cursor:pointer">' +
         '<div class="product-card-image"><img src="'+p.image+'" style="aspect-ratio:1;object-fit:cover" onerror="this.onerror=null;this.src=FALLBACK_IMG"></div>' +
-        '<div class="product-info"><span class="product-cat">'+p.category+'</span>' +
-        '<h3 class="product-name" style="font-size:14px">'+p.name+'</h3>' +
+        '<div class="product-info"><span class="product-cat">'+ec+'</span>' +
+        '<h3 class="product-name" style="font-size:14px">'+en+'</h3>' +
         '<div class="product-price"><span class="price-current" style="font-size:15px">$'+p.price+'</span></div></div></div>';
     }).join('') + '</div>';
 }
@@ -1102,7 +1115,7 @@ function handleSearch(q) {
     const pid = p._id || p.id;
     return '<div class="search-result-item" onclick="navigate(\'shop\');openProductModal(\''+pid+'\')">' +
     '<img src="'+p.image+'" style="width:40px;height:40px;border-radius:8px;object-fit:cover" onerror="this.onerror=null;this.src=FALLBACK_IMG">' +
-    '<div><div style="font-size:14px">'+p.name+'</div><div style="font-size:12px;color:rgba(245,240,232,0.4)">$'+p.price+'</div></div></div>';
+    '<div><div style="font-size:14px">'+esc(p.name)+'</div><div style="font-size:12px;color:rgba(245,240,232,0.4)">$'+p.price+'</div></div></div>';
   }).join('');
   results.classList.add('show');
 }
@@ -1295,9 +1308,9 @@ async function checkoutStep(n) {
       const p = getProduct(i.id);
       if (!p) return;
       total += p.price * i.qty;
-      html += '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--glass-border)"><span>'+p.name+' × '+i.qty+'</span><span>$'+(p.price*i.qty)+'</span></div>';
+      html += '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--glass-border)"><span>'+esc(p.name)+' × '+i.qty+'</span><span>$'+(p.price*i.qty)+'</span></div>';
     });
-    const discount = promoApplied ? total * 0.2 : 0;
+    const discount = appliedPromoCode ? total * 0.2 : 0;
     if (discount) html += '<div style="display:flex;justify-content:space-between;padding:8px 0;color:var(--green)"><span>Discount (20%)</span><span>-$'+Math.round(discount)+'</span></div>';
     html += '<div style="display:flex;justify-content:space-between;padding:12px 0 0;font-size:18px;font-weight:600"><span>Total</span><span>$'+Math.round(total-discount)+'</span></div></div>';
     review.innerHTML = html;
@@ -1321,7 +1334,7 @@ async function checkoutStep(n) {
       orders.unshift(order);
       const orderNum = '#SHOP-' + String(order._id || order.id).slice(-6).toUpperCase();
       document.getElementById('orderNumber').textContent = orderNum;
-      cart = []; promoApplied = false; saveCart();
+      cart = []; appliedPromoCode = null; saveCart();
       showToast('Order placed successfully!');
     } catch (err) {
       showToast(err.message || 'Failed to place order');
@@ -1356,7 +1369,7 @@ async function renderOrders() {
     empty.style.display = 'none';
     body.innerHTML = userOrders.map(o => {
       const canCancel = ['pending','confirmed'].includes(o.status);
-      return '<tr><td>'+(o._id || o.id)+'</td><td>'+(o.createdAt ? new Date(o.createdAt).toLocaleDateString() : o.date)+'</td><td>'+o.items.length+'</td><td>$'+o.total+'</td><td><span class="status-badge status-processing">'+(o.status || 'Processing')+'</span>' +
+      return '<tr><td>'+esc(o._id || o.id)+'</td><td>'+(o.createdAt ? new Date(o.createdAt).toLocaleDateString() : o.date)+'</td><td>'+o.items.length+'</td><td>$'+o.total+'</td><td><span class="status-badge status-processing">'+esc(o.status || 'Processing')+'</span>' +
       (canCancel ? ' <button class="btn-danger" style="padding:2px 8px;font-size:10px;margin-left:4px" onclick="cancelOrder(\''+(o._id||o.id)+'\')">Cancel</button>' : '') +
       '</td></tr>';
     }).join('');
@@ -1466,7 +1479,7 @@ function renderAdminProducts() {
       p.stock <= 10 ? '<span class="status-badge" style="background:rgba(253,203,110,0.2);color:var(--gold)">Low Stock ('+p.stock+')</span>' :
       '<span class="status-badge status-delivered">In Stock</span>';
     return '<tr><td><img src="'+p.image+'" style="width:40px;height:40px;border-radius:8px;object-fit:cover" onerror="this.onerror=null;this.src=FALLBACK_IMG"></td>' +
-    '<td>'+p.name+'</td><td>$'+p.price+'</td><td>'+p.stock+'</td>' +
+    '<td>'+esc(p.name)+'</td><td>$'+p.price+'</td><td>'+p.stock+'</td>' +
     '<td>'+stockStatus+'</td>' +
     '<td><div style="display:flex;gap:4px"><button class="btn-primary" style="padding:4px 10px;font-size:10px" onclick="openEditProduct(\''+(p._id||p.id)+'\')">Edit</button><button class="btn-danger" style="padding:4px 10px;font-size:10px" onclick="deleteProduct(\''+(p._id||p.id)+'\')">Delete</button></div></td></tr>';
   }).join('');
@@ -1490,22 +1503,39 @@ async function renderAdminOrders() {
     try { const d = await apiGet('/orders?limit=100'); allOrders = d.orders || d; } catch {}
   }
   if (allOrders.length === 0) { body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:rgba(245,240,232,0.3)">No orders yet</td></tr>'; return; }
-  body.innerHTML = allOrders.map(o => '<tr><td>'+(o._id||o.id)+'</td><td>'+(o.shippingInfo?.name || o.user?.name || '—')+'</td><td>'+(o.createdAt?new Date(o.createdAt).toLocaleDateString():o.date)+'</td><td>$'+o.total+'</td><td><span class="status-badge status-processing">'+(o.status||'Processing')+'</span></td></tr>').join('');
+  body.innerHTML = allOrders.map(o => '<tr><td>'+esc(o._id||o.id)+'</td><td>'+esc(o.shippingInfo?.name || o.user?.name || '—')+'</td><td>'+(o.createdAt?new Date(o.createdAt).toLocaleDateString():o.date)+'</td><td>$'+o.total+'</td><td><span class="status-badge status-processing">'+esc(o.status||'Processing')+'</span></td></tr>').join('');
 }
 
 async function renderAnalytics() {
   let allOrders = orders;
   if (TOKEN) {
-    try { const d = await apiGet('/orders?limit=100'); allOrders = d.orders || d; } catch {}
+    try { const d = await apiGet('/orders?limit=1000'); allOrders = d.orders || d; } catch {}
   }
   const totalRev = allOrders.reduce((s,o) => s + o.total, 0);
   const today = new Date().toLocaleDateString();
-  const todayOrders = allOrders.filter(o => (o.createdAt?new Date(o.createdAt).toLocaleDateString():o.date) === today).length;
+  const todayOrders = allOrders.filter(o => (o.createdAt?new Date(o.createdAt).toLocaleDateString():o.date) === today);
+  const activeUsers = new Set(todayOrders.map(o => o.user?.email || o.shippingInfo?.email || o.userId).filter(Boolean)).size;
   document.querySelector('#apanel-analytics .stat-value:first-child').textContent = '$' + totalRev;
-  document.querySelector('#apanel-analytics .stat-value:nth-child(2)').textContent = todayOrders;
-  document.querySelector('#apanel-analytics .stat-value:nth-child(3)').textContent = '1';
-  simpleChart('salesChart', [12,19,8,22,15,28,35], '#6c5ce7');
-  simpleChart('categoryChart', [35,25,20,12,8], '#00b894');
+  document.querySelector('#apanel-analytics .stat-value:nth-child(2)').textContent = todayOrders.length;
+  document.querySelector('#apanel-analytics .stat-value:nth-child(3)').textContent = activeUsers || 0;
+
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toLocaleDateString();
+    days.push(Math.round(allOrders.filter(o => (o.createdAt?new Date(o.createdAt).toLocaleDateString():o.date) === key).reduce((s,o) => s + o.total, 0)));
+  }
+  simpleChart('salesChart', days, '#6c5ce7');
+
+  const catCounts = {};
+  allOrders.forEach(o => (o.items || []).forEach(item => {
+    const p = products.find(p => (p._id||p.id) === (item.product||item.id));
+    const cat = p?.category || item.category || 'Other';
+    catCounts[cat] = (catCounts[cat] || 0) + (item.qty || 1);
+  }));
+  const catValues = Object.values(catCounts);
+  simpleChart('categoryChart', catValues.length ? catValues : [0], '#00b894');
 }
 
 // ==================== LOADING ====================
@@ -1656,6 +1686,23 @@ async function init() {
 }
 
   document.addEventListener('DOMContentLoaded', init);
+
+// ==================== FALLBACK PRODUCTS (when API is unreachable) ====================
+const FALLBACK_PRODUCTS = [
+  {_id:"fb-sonicbuds",name:"SonicBuds Pro",category:"electronics",price:149,originalPrice:199,rating:4.8,reviewCount:2456,description:"Premium wireless earbuds with active noise cancellation, 30h battery life, and crystal-clear call quality.",image:"https://images.unsplash.com/photo-1590658268037-6bf12f032f75?w=600&q=80&auto=format&fit=crop",badge:"bestseller",stock:150,colors:[],sizes:["Standard"]},
+  {_id:"fb-luminova",name:"Luminova Watch",category:"electronics",price:299,originalPrice:399,rating:4.7,reviewCount:1832,description:"Minimalist smartwatch with health tracking, GPS, and 14-day battery.",image:"https://images.unsplash.com/photo-1524592094714-0f0654e20314?w=600&q=80&auto=format&fit=crop",badge:"sale",stock:80,colors:[],sizes:["Standard"]},
+  {_id:"fb-novaphone",name:"NovaPhone 15 Pro",category:"electronics",price:1199,rating:4.9,reviewCount:5678,description:"Flagship smartphone with pro-grade camera system and A17 chip.",image:"https://images.unsplash.com/photo-1592899677977-9c10ca588bbd?w=600&q=80&auto=format&fit=crop",badge:"new",stock:45,colors:[],sizes:["Standard"]},
+  {_id:"fb-quantum-mouse",name:"Quantum Mouse",category:"electronics",price:79,originalPrice:99,rating:4.5,reviewCount:892,description:"Ultra-light gaming mouse with 26K DPI sensor, RGB lighting.",image:"https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=600&q=80&auto=format&fit=crop",stock:200,colors:[],sizes:["Standard"]},
+  {_id:"fb-urban-jacket",name:"Urban Drift Jacket",category:"fashion",price:189,rating:4.6,reviewCount:723,description:"Water-resistant urban jacket with sustainable materials.",image:"https://images.unsplash.com/photo-1551028719-00167b16eac5?w=600&q=80&auto=format&fit=crop",badge:"new",stock:60,colors:[],sizes:["S","M","L","XL"]},
+  {_id:"fb-aria-sneakers",name:"Aria Sneakers",category:"fashion",price:129,rating:4.7,reviewCount:1567,description:"Lightweight knit sneakers with cloud-cushion sole.",image:"https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&q=80&auto=format&fit=crop",badge:"bestseller",stock:120,colors:[],sizes:["7","8","9","10","11"]},
+  {_id:"fb-velora-tote",name:"Velora Tote",category:"fashion",price:249,rating:4.8,reviewCount:432,description:"Handcrafted leather tote bag with gold hardware.",image:"https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=600&q=80&auto=format&fit=crop",stock:35,colors:[],sizes:["Standard"]},
+  {_id:"fb-purity-serum",name:"Purity Serum",category:"beauty",price:58,rating:4.4,reviewCount:2103,description:"Vitamin C brightening serum with hyaluronic acid.",image:"https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=600&q=80&auto=format&fit=crop",badge:"bestseller",stock:300,colors:[],sizes:["Standard"]},
+  {_id:"fb-nordic-planter",name:"Nordic Planter Set",category:"home-garden",price:45,rating:4.3,reviewCount:567,description:"Set of 3 ceramic planters with minimalist Nordic design.",image:"https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=600&q=80&auto=format&fit=crop",stock:90,colors:[],sizes:["Standard"]},
+  {_id:"fb-yoga-mat",name:"Pro Yoga Mat",category:"sports",price:68,rating:4.6,reviewCount:1234,description:"Extra-thick eco-friendly yoga mat with alignment lines.",image:"https://images.unsplash.com/photo-1601925260368-ae2f83cf8b7f?w=600&q=80&auto=format&fit=crop",badge:"new",stock:180,colors:[],sizes:["Standard"]},
+  {_id:"fb-smartdesk",name:"SmartDesk Pro",category:"home-garden",price:599,originalPrice:799,rating:4.7,reviewCount:876,description:"Electric standing desk with memory presets and bamboo top.",image:"https://images.unsplash.com/photo-1518455027359-f3f8164ba6bc?w=600&q=80&auto=format&fit=crop",badge:"sale",stock:25,colors:[],sizes:["Standard"]},
+  {_id:"fb-wireless-charger",name:"Wireless Charger Pad",category:"electronics",price:35,rating:4.2,reviewCount:3456,description:"15W fast wireless charger compatible with all Qi devices.",image:"https://images.unsplash.com/photo-1583394838336-acd977736f90?w=600&q=80&auto=format&fit=crop",stock:500,colors:[],sizes:["Standard"]},
+  {_id:"fb-classic-leather",name:"Classic Leather Jacket",category:"fashion",price:349,originalPrice:399,rating:4.6,reviewCount:98,description:"Timeless genuine leather jacket with a modern slim fit.",image:"https://images.unsplash.com/photo-1551028719-00167b16eac5?w=600&q=80&auto=format&fit=crop",badge:"new",stock:34,colors:[],sizes:["S","M","L","XL"]},
+];
 
 // ==================== IMAGE FALLBACK ====================
 const FALLBACK_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600'%3E%3Crect width='600' height='600' fill='%232a2a2a'/%3E%3Ctext x='300' y='300' text-anchor='middle' fill='%236c5ce7' font-size='20' font-family='sans-serif'%3ENo Image%3C/text%3E%3C/svg%3E";

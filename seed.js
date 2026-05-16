@@ -21,24 +21,25 @@ const products = [
 
 async function seed() {
   await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/velora");
-  await Product.deleteMany({});
-  await Product.insertMany(products);
-  const adminExists = await User.findOne({ email: "admin@velora.com" });
-  if (!adminExists) {
-    await User.create({ name: "Admin", email: "admin@velora.com", password: "admin1234", role: "admin" });
+  try {
+    await Product.deleteMany({});
+    await Product.insertMany(products);
+    const adminExists = await User.findOne({ email: "admin@velora.com" });
+    if (!adminExists) {
+      await User.create({ name: "Admin", email: "admin@velora.com", password: "admin1234", role: "admin" });
+    }
+    const customerExists = await User.findOne({ email: "customer@velora.com" });
+    if (!customerExists) {
+      await User.create({ name: "Customer", email: "customer@velora.com", password: "customer1234", role: "customer" });
+    }
+    const promoExists = await PromoCode.findOne({ code: "SAVE20" });
+    if (!promoExists) {
+      await PromoCode.create({ code: "SAVE20", discountPercent: 20, maxUses: 100, minOrderValue: 0 });
+    }
+    console.log(`Seeded ${products.length} products`);
+  } finally {
+    await mongoose.disconnect();
   }
-  const customerExists = await User.findOne({ email: "customer@velora.com" });
-  if (!customerExists) {
-    await User.create({ name: "Customer", email: "customer@velora.com", password: "customer1234", role: "customer" });
-  }
-  const promoExists = await PromoCode.findOne({ code: "SAVE20" });
-  if (!promoExists) {
-    await PromoCode.create({ code: "SAVE20", discountPercent: 20, maxUses: 100, minOrderValue: 0 });
-  }
-  console.log(`Seeded ${products.length} products`);
-  console.log("Admin: admin@velora.com / admin1234");
-  console.log("Customer: customer@velora.com / customer1234");
-  process.exit(0);
 }
 
 seed().catch((e) => { console.error(e); process.exit(1); });

@@ -4,7 +4,7 @@ const env = {
   PORT: parseInt(process.env.PORT, 10) || 5000,
   NODE_ENV: process.env.NODE_ENV || "development",
   MONGODB_URI: process.env.MONGODB_URI || "mongodb://localhost:27017/velora",
-  JWT_SECRET: process.env.JWT_SECRET || "dev-secret",
+  JWT_SECRET: process.env.JWT_SECRET || "59af6c2604821d6bdd70da97c898385f29e6a969d0797ad0f4b3465f6b245b3276d705f1be51f8b251157558f3f4f331164bd6f28cdb8a442f32779779577185",
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || "7d",
   CLIENT_URL: process.env.CLIENT_URL || "http://localhost:5000",
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || "",
