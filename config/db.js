@@ -2,22 +2,21 @@ const mongoose = require("mongoose");
 
 const MONGO_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/velora";
 
-async function connectDB() {
-  try {
-    await mongoose.connect(MONGO_URI);
-    console.log("Connected to MongoDB");
-  } catch (err) {
-    console.error("MongoDB connection error:", err.message);
-    process.exit(1);
-  }
+let cached = global._mongooseCache;
+if (!cached) {
+  cached = global._mongooseCache = { conn: null, promise: null };
 }
 
-mongoose.connection.on("disconnected", () => {
-  console.warn("MongoDB disconnected. Attempting to reconnect...");
-});
-
-mongoose.connection.on("error", (err) => {
-  console.error("MongoDB error:", err.message);
-});
+async function connectDB() {
+  if (cached.conn) return cached.conn;
+  if (!cached.promise) {
+    cached.promise = mongoose.connect(MONGO_URI).then((m) => {
+      console.log("Connected to MongoDB");
+      return m;
+    });
+  }
+  cached.conn = await cached.promise;
+  return cached.conn;
+}
 
 module.exports = { connectDB, MONGO_URI };

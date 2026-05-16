@@ -29,6 +29,7 @@ const orderSchema = new mongoose.Schema({
     country: String,
   },
   promoCode: String,
+  paymentIntentId: String,
 }, { timestamps: true });
 
 module.exports = mongoose.model("Order", orderSchema);

@@ -23,6 +23,12 @@ const promoCodesRoutes = require("./routes/promoCodes");
 
 const app = express();
 
+// Auto-connect DB on each request (uses cached connection in serverless)
+app.use(async (req, res, next) => {
+  try { await connectDB(); } catch {}
+  next();
+});
+
 // Security & logging middleware
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
